@@ -92,6 +92,25 @@ function updateSmiles(smiles) {
   loadCurrentMolecule();
 }
 
+function selectMolecule(smiles, name = "") {
+  updateSmiles(smiles);
+  const selectElem = document.getElementById("sidebar-example-select");
+  if (selectElem) {
+    for (let opt of selectElem.options) {
+      if (opt.value === smiles) {
+        selectElem.value = smiles;
+        break;
+      }
+    }
+  }
+  const customInput = document.getElementById("sidebar-custom-smiles");
+  if (customInput) customInput.value = smiles;
+
+  showPage("visualization");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+window.selectMolecule = selectMolecule;
+
 // Navigation between 8 pages
 function initNavigation() {
   const navItems = document.querySelectorAll(".nav-radio-item");

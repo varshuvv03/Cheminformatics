@@ -157,15 +157,19 @@
 
         <div class="divider"></div>
 
-        <h3 style="color: var(--primary-dark); margin-bottom: 16px;">🧬 Example Molecules</h3>
+        <h3 style="color: var(--primary-dark); margin-bottom: 10px;">🧬 Example Molecules Gallery</h3>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">Click any compound to load it into the active workspace:</p>
         
         <!-- Row 1 of 5 -->
         <div class="grid-5" style="margin-bottom: 18px;">
           {% for name, smi in example_molecules_row1 %}
-          <div class="mol-card">
-            <img src="/api/mol2d?smiles={{ smi | urlencode }}&w=250&h=250" alt="{{ name }}">
-            <div class="mol-card-title">{{ name }}</div>
-            <div class="mol-card-code"><code>{{ smi }}</code></div>
+          <div class="mol-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <img src="/api/mol2d?smiles={{ smi | urlencode }}&w=250&h=250" alt="{{ name }}" style="max-height: 140px; object-fit: contain; margin-bottom: 8px;">
+              <div class="mol-card-title">{{ name }}</div>
+              <div class="mol-card-code" style="margin-bottom: 10px;"><code>{{ smi }}</code></div>
+            </div>
+            <button type="button" class="btn btn-primary" style="width: 100%; font-size: 0.82rem; padding: 6px 10px; margin-top: auto;" onclick="selectMolecule('{{ smi }}', '{{ name }}')">Load Molecule</button>
           </div>
           {% endfor %}
         </div>
@@ -173,10 +177,13 @@
         <!-- Row 2 of 5 -->
         <div class="grid-5" style="margin-bottom: 24px;">
           {% for name, smi in example_molecules_row2 %}
-          <div class="mol-card">
-            <img src="/api/mol2d?smiles={{ smi | urlencode }}&w=250&h=250" alt="{{ name }}">
-            <div class="mol-card-title">{{ name }}</div>
-            <div class="mol-card-code"><code>{{ smi }}</code></div>
+          <div class="mol-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <img src="/api/mol2d?smiles={{ smi | urlencode }}&w=250&h=250" alt="{{ name }}" style="max-height: 140px; object-fit: contain; margin-bottom: 8px;">
+              <div class="mol-card-title">{{ name }}</div>
+              <div class="mol-card-code" style="margin-bottom: 10px;"><code>{{ smi }}</code></div>
+            </div>
+            <button type="button" class="btn btn-primary" style="width: 100%; font-size: 0.82rem; padding: 6px 10px; margin-top: auto;" onclick="selectMolecule('{{ smi }}', '{{ name }}')">Load Molecule</button>
           </div>
           {% endfor %}
         </div>
