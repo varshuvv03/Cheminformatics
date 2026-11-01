@@ -27,7 +27,6 @@ from PIL import Image as PILImage
 from rdkit import Chem
 from rdkit.Chem import (
     Descriptors,
-    Draw,
     AllChem,
     rdMolDescriptors,
     Lipinski,
@@ -37,6 +36,19 @@ from rdkit.Chem import (
 )
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit import DataStructs
+
+# Safe 2D Drawing for Headless & Serverless Environments (e.g. Vercel)
+try:
+    from rdkit.Chem import Draw
+    HAS_RDKIT_DRAW = True
+except (ImportError, Exception):
+    HAS_RDKIT_DRAW = False
+
+try:
+    from rdkit.Chem.Draw import rdMolDraw2D
+    HAS_RDKIT_MOLDRAW2D = True
+except (ImportError, Exception):
+    HAS_RDKIT_MOLDRAW2D = False
 
 # PDF generation
 from reportlab.lib.pagesizes import A4
@@ -60,7 +72,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(
+    __name__,
+    static_folder=os.path.join(BASE_DIR, "static"),
+    template_folder=os.path.join(BASE_DIR, "templates"),
+)
 
 # ============================================================================
 # EXAMPLE MOLECULES DATABASE
@@ -93,8 +111,8 @@ def validate_smiles(smiles):
 
 
 def get_mol_2d_image(mol, size=(400, 400)):
-    """Generate a 2D image of the molecule."""
-    if mol is None:
+    """Generate a 2D image of the molecule as PIL Image if Draw module is available."""
+    if mol is None or not HAS_RDKIT_DRAW:
         return None
     try:
         img = Draw.MolToImage(mol, size=size)
@@ -112,6 +130,19 @@ def get_mol_2d_image_bytes(mol, size=(400, 400)):
     img.save(buf, format="PNG")
     buf.seek(0)
     return buf
+
+
+def get_mol_2d_svg(mol, width=400, height=400):
+    """Generate 2D vector SVG using rdMolDraw2D (zero OS C-lib dependency, runs cleanly on Vercel)."""
+    if mol is None or not HAS_RDKIT_MOLDRAW2D:
+        return None
+    try:
+        drawer = rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer.DrawMolecule(mol)
+        drawer.FinishDrawing()
+        return drawer.GetDrawingText()
+    except Exception:
+        return None
 
 
 def generate_3d_coords(mol):
@@ -363,7 +394,7 @@ class NumberedCanvas(canvas.Canvas):
 
     def draw_page_decorations(self, page_count):
         self.saveState()
-        logo_path = "assets/srm_logo.png"
+        logo_path = os.path.join(BASE_DIR, "assets", "srm_logo.png")
 
         if self._pageNumber > 1:
             if os.path.exists(logo_path):
@@ -477,7 +508,7 @@ def build_pdf_report(student_name, reg_no, molecules_data, style_3d="ball_and_st
     tbl_hstyle = ParagraphStyle("tblh", fontSize=7, leading=8.5, textColor=colors.white)
 
     story = []
-    logo_path = "assets/srm_logo.png"
+    logo_path = os.path.join(BASE_DIR, "assets", "srm_logo.png")
 
     # PAGE 1: TITLE & COVER
     if os.path.exists(logo_path):
@@ -588,9 +619,12 @@ def build_pdf_report(student_name, reg_no, molecules_data, style_3d="ball_and_st
         cmol_3d = generate_3d_coords(cmol)
         img3d_buf = generate_static_3d_image(cmol_3d, style=style_3d)
 
+        img2d_cell = RLImage(img2d_buf, width=7.2 * cm, height=4.6 * cm) if img2d_buf else Paragraph(f"<b>2D Structure:</b><br/><code>{csmi}</code>", ParagraphStyle("no_2d", fontSize=8, alignment=TA_CENTER))
+        img3d_cell = RLImage(img3d_buf, width=7.2 * cm, height=4.6 * cm) if img3d_buf else Paragraph("<b>3D Model Conformer</b>", ParagraphStyle("no_3d", fontSize=8, alignment=TA_CENTER))
+
         img_row = Table([
             [Paragraph("<b>2D Chemical Structure</b>", ParagraphStyle("l1", alignment=TA_CENTER, fontSize=7.5)), Paragraph("<b>3D Molecular Model (Conformer)</b>", ParagraphStyle("l2", alignment=TA_CENTER, fontSize=7.5))],
-            [RLImage(img2d_buf, width=7.2 * cm, height=4.6 * cm), RLImage(img3d_buf, width=7.2 * cm, height=4.6 * cm)]
+            [img2d_cell, img3d_cell]
         ], colWidths=[9.1 * cm, 9.1 * cm])
         img_row.setStyle(TableStyle([
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -1018,7 +1052,7 @@ def index():
 
 @app.route("/assets/<path:filename>")
 def serve_asset(filename):
-    return send_from_directory("assets", filename)
+    return send_from_directory(os.path.join(BASE_DIR, "assets"), filename)
 
 
 @app.route("/api/validate", methods=["POST"])
@@ -1056,10 +1090,18 @@ def api_mol2d():
     mol = validate_smiles(smiles)
     if mol is None:
         return Response(status=404)
+
+    # 1. Try standard PNG via Draw.MolToImage
     buf = get_mol_2d_image_bytes(mol, size=(w, h))
-    if buf is None:
-        return Response(status=500)
-    return send_file(buf, mimetype="image/png")
+    if buf:
+        return send_file(buf, mimetype="image/png")
+
+    # 2. Safe headless vector SVG via rdMolDraw2D (zero X11/libXrender dependency, runs cleanly on Vercel)
+    svg_text = get_mol_2d_svg(mol, width=w, height=h)
+    if svg_text:
+        return Response(svg_text, mimetype="image/svg+xml")
+
+    return Response("Could not render molecular structure", status=500)
 
 
 @app.route("/api/mol3d", methods=["POST"])
