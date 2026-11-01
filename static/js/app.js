@@ -144,9 +144,11 @@ function showPage(pageKey) {
   });
 
   // Trigger page-specific loaders
-  if (pageKey === "theory" && !state.theory3dLoaded) {
-    loadTheory3DModels();
-    state.theory3dLoaded = true;
+  if (pageKey === "theory") {
+    const activeTab = document.querySelector("#theory-tabs .tab-btn.active");
+    if (activeTab && activeTab.dataset.pane === "theory-pane-models") {
+      setTimeout(() => loadTheory3DModels(), 50);
+    }
   } else if (pageKey === "visualization") {
     loadVisualizationPage();
   } else if (pageKey === "properties") {
@@ -271,6 +273,9 @@ function initTheoryTabs() {
           p.classList.remove("active");
         }
       });
+      if (targetPane === "theory-pane-models") {
+        setTimeout(() => loadTheory3DModels(), 50);
+      }
     });
   });
 }
@@ -279,10 +284,12 @@ async function loadTheory3DModels() {
   const aspirinSmiles = "CC(=O)OC1=CC=CC=C1C(=O)O";
   const molBlock = await fetchMol3DBlock(aspirinSmiles);
   if (molBlock) {
-    render3DModel("theory-3d-ball-stick", molBlock, "ball_and_stick", false);
-    render3DModel("theory-3d-stick", molBlock, "stick", false);
-    render3DModel("theory-3d-space-filling", molBlock, "space_filling", false);
-    render3DModel("theory-3d-wireframe", molBlock, "wireframe", false);
+    setTimeout(() => {
+      render3DModel("theory-3d-ball-stick", molBlock, "ball_and_stick", false);
+      render3DModel("theory-3d-stick", molBlock, "stick", false);
+      render3DModel("theory-3d-space-filling", molBlock, "space_filling", false);
+      render3DModel("theory-3d-wireframe", molBlock, "wireframe", false);
+    }, 50);
   }
 }
 
