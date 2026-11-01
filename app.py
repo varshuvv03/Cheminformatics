@@ -8,6 +8,10 @@ import io
 import json
 import base64
 import hashlib
+import smtplib
+from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from io import BytesIO
 
 from flask import (
@@ -1335,10 +1339,122 @@ def api_advanced():
     return jsonify(result)
 
 
+INSTRUCTOR_EMAIL = "ss.ravibharathi@gmail.com"
+
+
+def send_quiz_results_email(student_name, student_email, reg_no, score, total, percentage, feedback, missed):
+    """Deliver student quiz results to instructor and archive locally."""
+    smtp_user = os.environ.get("SMTP_USER") or os.environ.get("GMAIL_USER")
+    smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
+
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #d1e7dd; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: #2e8b57; color: #ffffff; padding: 18px 24px;">
+            <h2 style="margin: 0; font-size: 20px;">Cheminformatics Virtual Laboratory</h2>
+            <p style="margin: 4px 0 0; font-size: 13px;">SRM Institute of Science and Technology - Tiruchirappalli Campus</p>
+            <p style="margin: 2px 0 0; font-size: 12px; opacity: 0.9;">Student Assessment Quiz Submission</p>
+        </div>
+        <div style="padding: 24px; background-color: #ffffff; color: #1e293b;">
+            <h3 style="color: #1b4d32; margin-top: 0;">Student Evaluation Report</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <tr style="background: #f8fafc;"><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: bold; width: 35%;">Student Name:</td><td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{student_name}</td></tr>
+                <tr><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: bold;">Student Email:</td><td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{student_email or "Not provided"}</td></tr>
+                <tr style="background: #f8fafc;"><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: bold;">Registration No:</td><td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{reg_no}</td></tr>
+                <tr><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: bold;">Quiz Score:</td><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 16px; font-weight: bold; color: #2e8b57;">{score} / {total} ({percentage}%)</td></tr>
+                <tr style="background: #f8fafc;"><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: bold;">Performance Feedback:</td><td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{feedback}</td></tr>
+                <tr><td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: bold;">Submitted At:</td><td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</td></tr>
+            </table>
+    """
+
+    if missed:
+        html_content += """
+            <h4 style="color: #dc2626; margin-bottom: 8px;">Incorrect / Missed Questions Breakdown:</h4>
+            <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 12px;">
+        """
+        for m in missed:
+            html_content += f"""
+                <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #fda4af;">
+                    <b>Q{m['index']}. {m['question']}</b><br/>
+                    <span style="color: #dc2626; font-size: 13px;">Student Answer: {m.get('your_answer') or m.get('selected_answer')}</span><br/>
+                    <span style="color: #16a34a; font-size: 13px; font-weight: bold;">Correct Answer: {m['correct_answer']}</span>
+                </div>
+            """
+        html_content += "</div>"
+    else:
+        html_content += """
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px; color: #166534; font-weight: bold;">
+                🌟 Outstanding! Perfect score with zero missed questions.
+            </div>
+        """
+
+    html_content += f"""
+        </div>
+        <div style="background-color: #f8fafc; padding: 12px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+            Cheminformatics Virtual Laboratory &bull; Department of Computer Science / Cybersecurity &bull; SRMIST Tiruchirappalli
+        </div>
+    </div>
+    """
+
+    email_sent = False
+    status_detail = ""
+
+    if smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"🎓 Quiz Submission: {student_name} ({score}/{total} - {percentage}%)"
+            msg["From"] = smtp_user
+            msg["To"] = INSTRUCTOR_EMAIL
+            if student_email and "@" in student_email:
+                msg["Cc"] = student_email
+            msg.attach(MIMEText(html_content, "html"))
+
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+            email_sent = True
+            status_detail = f"Email dispatched directly via SMTP to {INSTRUCTOR_EMAIL}"
+        except Exception as e:
+            email_sent = False
+            status_detail = f"SMTP error: {str(e)}"
+    else:
+        status_detail = f"Recorded to quiz_submissions.json & linked to {INSTRUCTOR_EMAIL}"
+
+    try:
+        log_file = os.path.join(BASE_DIR, "quiz_submissions.json")
+        submissions = []
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                submissions = json.load(f)
+        submissions.append({
+            "timestamp": datetime.now().isoformat(),
+            "student_name": student_name,
+            "student_email": student_email,
+            "reg_no": reg_no,
+            "score": score,
+            "total": total,
+            "percentage": percentage,
+            "feedback": feedback,
+            "missed_count": len(missed),
+            "target_instructor": INSTRUCTOR_EMAIL,
+            "email_sent": email_sent,
+            "email_status": status_detail,
+        })
+        with open(log_file, "w", encoding="utf-8") as f:
+            json.dump(submissions, f, indent=2)
+    except Exception as e:
+        print(f"Submission archive error: {e}")
+
+    return email_sent, status_detail
+
+
 @app.route("/api/quiz/submit", methods=["POST"])
+@app.route("/api/submit-quiz", methods=["POST"])
 def api_quiz_submit():
     data = request.get_json() or {}
     user_answers = data.get("answers", {})  # { "0": 1, ... }
+    student_name = data.get("student_name", "Anonymous Student")
+    student_email = data.get("student_email", "")
+    reg_no = data.get("reg_no", "N/A")
     
     score = 0
     total = len(QUIZ_QUESTIONS)
@@ -1369,11 +1485,38 @@ def api_quiz_submit():
             })
             
     pct = round((score / total) * 100, 1)
+
+    if pct >= 80:
+        feedback = "🌟 Outstanding! You have demonstrated exceptional mastery of cheminformatics."
+        badge = "badge-success"
+    elif pct >= 60:
+        feedback = "👍 Good effort! Review the topics you missed to reinforce your concepts."
+        badge = "badge-warning"
+    else:
+        feedback = "📚 Needs improvement. Please revisit the Theory section to improve understanding."
+        badge = "badge-danger"
+
+    email_sent, email_status = send_quiz_results_email(
+        student_name=student_name,
+        student_email=student_email,
+        reg_no=reg_no,
+        score=score,
+        total=total,
+        percentage=pct,
+        feedback=feedback,
+        missed=wrong,
+    )
+
     return jsonify({
         "score": score,
         "total": total,
         "percentage": pct,
+        "feedback": feedback,
+        "badge": badge,
         "wrong": wrong,
+        "instructor_email": INSTRUCTOR_EMAIL,
+        "email_sent": email_sent,
+        "email_status": email_status,
     })
 
 

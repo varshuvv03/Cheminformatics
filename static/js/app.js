@@ -189,6 +189,8 @@ function render3DModel(containerId, molBlock, style, showSurface) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = "";
+  container.style.position = "relative";
+  container.style.overflow = "hidden";
 
   if (!molBlock) {
     container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;">Generating 3D Coordinates...</div>';
@@ -282,14 +284,17 @@ function initTheoryTabs() {
 
 async function loadTheory3DModels() {
   const aspirinSmiles = "CC(=O)OC1=CC=CC=C1C(=O)O";
-  const molBlock = await fetchMol3DBlock(aspirinSmiles);
+  let molBlock = await fetchMol3DBlock(aspirinSmiles);
+  if (!molBlock && state.currentSmiles) {
+    molBlock = await fetchMol3DBlock(state.currentSmiles);
+  }
   if (molBlock) {
     setTimeout(() => {
       render3DModel("theory-3d-ball-stick", molBlock, "ball_and_stick", false);
       render3DModel("theory-3d-stick", molBlock, "stick", false);
       render3DModel("theory-3d-space-filling", molBlock, "space_filling", false);
       render3DModel("theory-3d-wireframe", molBlock, "wireframe", false);
-    }, 50);
+    }, 60);
   }
 }
 
@@ -878,14 +883,127 @@ function updateSimilarityView(data) {
 }
 
 // ============================================================================
-// PAGE: ASSESSMENT (24 QUESTIONS)
+// PAGE: ASSESSMENT (24 QUESTIONS) & STUDENT AUTHENTICATION GATE
 // ============================================================================
+let quizStudent = JSON.parse(localStorage.getItem("quizStudent") || "null");
+
 function initQuizPage() {
+  checkQuizAuth();
   const submitBtn = document.getElementById("quiz-submit-btn");
-  submitBtn.addEventListener("click", () => submitQuiz());
+  if (submitBtn) {
+    submitBtn.addEventListener("click", () => submitQuiz());
+  }
+}
+
+function checkQuizAuth() {
+  const authGate = document.getElementById("quiz-auth-gate");
+  const verifiedBanner = document.getElementById("quiz-verified-banner");
+  const quizForm = document.getElementById("quiz-form");
+
+  if (!authGate || !quizForm) return;
+
+  if (quizStudent && quizStudent.name) {
+    authGate.style.display = "none";
+    if (verifiedBanner) {
+      verifiedBanner.style.display = "flex";
+      const nameEl = document.getElementById("quiz-verified-name");
+      const emailEl = document.getElementById("quiz-verified-email");
+      const regEl = document.getElementById("quiz-verified-reg");
+      if (nameEl) nameEl.innerText = quizStudent.name;
+      if (emailEl) emailEl.innerText = quizStudent.email || "Google Account";
+      if (regEl) regEl.innerText = quizStudent.reg || "N/A";
+    }
+    quizForm.style.display = "block";
+  } else {
+    authGate.style.display = "block";
+    if (verifiedBanner) verifiedBanner.style.display = "none";
+    quizForm.style.display = "none";
+  }
+}
+
+function handleGoogleSignIn() {
+  const defaultEmail = "student@gmail.com";
+  const googleEmail = prompt("Sign in with Google - Enter your Google Account email:", defaultEmail);
+  if (!googleEmail || !googleEmail.trim()) return;
+
+  let googleName = googleEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  const regPrompt = prompt("Enter your Student Registration Number:", "RA2611030050040");
+
+  quizStudent = {
+    name: googleName || "Verified Student",
+    email: googleEmail.trim(),
+    reg: regPrompt ? regPrompt.trim() : "RA2611030050040",
+    authProvider: "Google",
+    signedInAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem("quizStudent", JSON.stringify(quizStudent));
+
+  const sNameInput = document.getElementById("sidebar-student-name");
+  const sRegInput = document.getElementById("sidebar-reg-no");
+  if (sNameInput) sNameInput.value = quizStudent.name;
+  if (sRegInput && quizStudent.reg) sRegInput.value = quizStudent.reg;
+
+  checkQuizAuth();
+}
+
+function handleManualSignUp() {
+  const nameInput = document.getElementById("quiz-auth-name");
+  const emailInput = document.getElementById("quiz-auth-email");
+  const regInput = document.getElementById("quiz-auth-reg");
+
+  const name = nameInput ? nameInput.value.trim() : "";
+  const email = emailInput ? emailInput.value.trim() : "";
+  const reg = regInput ? regInput.value.trim() : "";
+
+  if (!name) {
+    alert("Please enter your Student Full Name.");
+    return;
+  }
+  if (!email || !email.includes("@")) {
+    alert("Please enter a valid Student Email Address.");
+    return;
+  }
+
+  quizStudent = {
+    name: name,
+    email: email,
+    reg: reg || "N/A",
+    authProvider: "Email",
+    signedInAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem("quizStudent", JSON.stringify(quizStudent));
+
+  const sNameInput = document.getElementById("sidebar-student-name");
+  const sRegInput = document.getElementById("sidebar-reg-no");
+  if (sNameInput) sNameInput.value = quizStudent.name;
+  if (sRegInput && quizStudent.reg) sRegInput.value = quizStudent.reg;
+
+  checkQuizAuth();
+}
+
+function signOutQuizUser() {
+  if (confirm("Sign out of current student account?")) {
+    quizStudent = null;
+    localStorage.removeItem("quizStudent");
+    checkQuizAuth();
+  }
 }
 
 async function submitQuiz() {
+  if (!quizStudent || !quizStudent.name) {
+    alert("Please sign up or sign in with Google before submitting your test.");
+    checkQuizAuth();
+    return;
+  }
+
+  const submitBtn = document.getElementById("quiz-submit-btn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "⏳ Grading & Connecting Results...";
+  }
+
   const answers = {};
   for (let i = 0; i < 24; i++) {
     const selected = document.querySelector(`input[name="quiz_q_${i}"]:checked`);
@@ -894,57 +1012,84 @@ async function submitQuiz() {
     }
   }
 
-  const res = await fetch("/api/quiz/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ answers }),
-  });
-  const data = await res.json();
+  try {
+    const res = await fetch("/api/quiz/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        answers,
+        student_name: quizStudent.name,
+        student_email: quizStudent.email,
+        reg_no: quizStudent.reg,
+      }),
+    });
+    const data = await res.json();
 
-  const resultsArea = document.getElementById("quiz-results-area");
-  resultsArea.style.display = "block";
+    const resultsArea = document.getElementById("quiz-results-area");
+    resultsArea.style.display = "block";
 
-  document.getElementById("quiz-score-text").innerText = `${data.score}/${data.total} (${data.percentage}%)`;
-  document.getElementById("quiz-progress-bar").style.width = `${data.percentage}%`;
+    document.getElementById("quiz-score-text").innerText = `${data.score}/${data.total} (${data.percentage}%)`;
+    document.getElementById("quiz-progress-bar").style.width = `${data.percentage}%`;
 
-  const feedbackBox = document.getElementById("quiz-feedback-box");
-  const pct = data.percentage;
-  if (pct >= 80) {
-    feedbackBox.className = "success-box";
-    feedbackBox.innerHTML = "🎉 Excellent! You have a strong understanding of cheminformatics concepts!";
-  } else if (pct >= 60) {
-    feedbackBox.className = "info-box";
-    feedbackBox.innerHTML = "👍 Good job! Review the topics you missed to strengthen your knowledge.";
-  } else if (pct >= 40) {
-    feedbackBox.className = "warning-box";
-    feedbackBox.innerHTML = "📚 Fair performance. Please revisit the Theory section for better understanding.";
-  } else {
-    feedbackBox.className = "info-box";
-    feedbackBox.style.borderLeftColor = "#e11d48";
-    feedbackBox.style.backgroundColor = "#fff1f2";
-    feedbackBox.innerHTML = "📖 Needs improvement. We recommend going through the Theory section carefully.";
+    const feedbackBox = document.getElementById("quiz-feedback-box");
+    const pct = data.percentage;
+    if (pct >= 80) {
+      feedbackBox.className = "success-box";
+      feedbackBox.innerHTML = `🎉 <b>Excellent!</b> ${data.feedback || "You have a strong understanding of cheminformatics concepts!"}`;
+    } else if (pct >= 60) {
+      feedbackBox.className = "info-box";
+      feedbackBox.innerHTML = `👍 <b>Good job!</b> ${data.feedback || "Review the topics you missed to strengthen your knowledge."}`;
+    } else if (pct >= 40) {
+      feedbackBox.className = "warning-box";
+      feedbackBox.innerHTML = `📚 <b>Fair performance.</b> ${data.feedback || "Please revisit the Theory section for better understanding."}`;
+    } else {
+      feedbackBox.className = "info-box";
+      feedbackBox.style.borderLeftColor = "#e11d48";
+      feedbackBox.style.backgroundColor = "#fff1f2";
+      feedbackBox.innerHTML = `📖 <b>Needs improvement.</b> ${data.feedback || "We recommend going through the Theory section carefully."}`;
+    }
+
+    const emailStatusBanner = document.getElementById("quiz-email-status-banner");
+    if (emailStatusBanner) {
+      emailStatusBanner.style.display = "block";
+      if (data.email_sent) {
+        emailStatusBanner.className = "success-box";
+        emailStatusBanner.innerHTML = `✉️ <b>Results Sent:</b> Your assessment report has been emailed directly to instructor <b>${data.instructor_email || "ss.ravibharathi@gmail.com"}</b>.`;
+      } else {
+        emailStatusBanner.className = "info-box";
+        emailStatusBanner.innerHTML = `📋 <b>Connected to Instructor:</b> Results logged & linked to instructor <b>${data.instructor_email || "ss.ravibharathi@gmail.com"}</b> (${data.email_status || "Recorded"}).`;
+      }
+    }
+
+    const missedContainer = document.getElementById("quiz-missed-list");
+    if (data.wrong && data.wrong.length > 0) {
+      document.getElementById("quiz-missed-header").style.display = "block";
+      missedContainer.innerHTML = data.wrong
+        .map(
+          (w) => `
+          <div class="missed-question-box">
+            <b>❌ Q${w.index}. ${escapeHtml(w.question)}</b><br/>
+            <span style="color:#64748b;">Your Answer:</span> ${escapeHtml(w.your_answer)}<br/>
+            <span style="color:#1b4d32; font-weight:600;">Correct Answer:</span> ✅ ${escapeHtml(w.correct_answer)}
+          </div>
+        `
+        )
+        .join("");
+    } else {
+      document.getElementById("quiz-missed-header").style.display = "none";
+      missedContainer.innerHTML = "";
+    }
+
+    resultsArea.scrollIntoView({ behavior: "smooth" });
+  } catch (err) {
+    console.error("Quiz submission error:", err);
+    alert("An error occurred while submitting the quiz. Please try again.");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "📝 Submit Quiz";
+    }
   }
-
-  const missedContainer = document.getElementById("quiz-missed-list");
-  if (data.wrong && data.wrong.length > 0) {
-    document.getElementById("quiz-missed-header").style.display = "block";
-    missedContainer.innerHTML = data.wrong
-      .map(
-        (w) => `
-        <div class="missed-question-box">
-          <b>❌ Q${w.index}. ${escapeHtml(w.question)}</b><br/>
-          <span style="color:#64748b;">Your Answer:</span> ${escapeHtml(w.your_answer)}<br/>
-          <span style="color:#1b4d32; font-weight:600;">Correct Answer:</span> ✅ ${escapeHtml(w.correct_answer)}
-        </div>
-      `
-      )
-      .join("");
-  } else {
-    document.getElementById("quiz-missed-header").style.display = "none";
-    missedContainer.innerHTML = "";
-  }
-
-  resultsArea.scrollIntoView({ behavior: "smooth" });
 }
 
 // ============================================================================

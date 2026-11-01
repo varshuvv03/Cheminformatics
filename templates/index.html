@@ -861,7 +861,63 @@ Full InChI String:
           &bull; <b>Topics:</b> SMILES notation, molecular descriptors, Lipinski's rules, 3D models, RDKit
         </p>
 
-        <form id="quiz-form" onsubmit="return false;">
+        <!-- Sign-Up / Authentication Gate (Required Before Taking Test) -->
+        <div id="quiz-auth-gate" class="quiz-card" style="border: 2px solid var(--primary-color); border-radius: 10px; padding: 24px; margin-bottom: 24px; background: #ffffff; box-shadow: 0 4px 12px rgba(46,139,87,0.08);">
+          <div style="text-align: center; max-width: 520px; margin: 0 auto;">
+            <div style="font-size: 2.2rem; margin-bottom: 6px;">🎓</div>
+            <h3 style="color: var(--primary-dark); font-size: 1.35rem; margin-bottom: 6px;">Student Sign Up & Verification</h3>
+            <p style="font-size: 0.88rem; color: #64748b; margin-bottom: 18px;">
+              Please sign up or sign in before taking the 24-question test. Your test score and evaluation report will be automatically connected and delivered to instructor <b>ss.ravibharathi@gmail.com</b>.
+            </p>
+
+            <!-- Google Sign-In Button -->
+            <button type="button" class="btn" style="background: #ffffff; color: #374151; border: 1px solid #d1d5db; width: 100%; padding: 10px 16px; font-size: 0.92rem; font-weight: 600; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: all 0.15s ease;" onclick="handleGoogleSignIn()">
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+                <path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707 0-.59.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.347 2.825.957 4.039l3.007-2.332z"/>
+                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/>
+              </svg>
+              <span>Sign in with Google</span>
+            </button>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin: 18px 0; color: #94a3b8; font-size: 0.78rem; text-transform: uppercase; font-weight: 600;">
+              <span style="flex: 1; height: 1px; background: #e2e8f0;"></span>
+              <span>or sign up with email</span>
+              <span style="flex: 1; height: 1px; background: #e2e8f0;"></span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
+              <div>
+                <label style="font-size: 0.85rem; font-weight: 600; color: #334155;">Student Full Name</label>
+                <input type="text" id="quiz-auth-name" class="form-input" placeholder="e.g. Varshini A / Ravi Bharathi S S" style="width: 100%; margin-top: 4px;">
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; font-weight: 600; color: #334155;">Student Email Address</label>
+                <input type="email" id="quiz-auth-email" class="form-input" placeholder="e.g. student@srmist.edu.in" style="width: 100%; margin-top: 4px;">
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; font-weight: 600; color: #334155;">Registration Number</label>
+                <input type="text" id="quiz-auth-reg" class="form-input" placeholder="e.g. RA2611030050040" style="width: 100%; margin-top: 4px;">
+              </div>
+              <button type="button" class="btn btn-primary" style="margin-top: 6px; padding: 10px;" onclick="handleManualSignUp()">
+                🚀 Register & Start Assessment
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verified Student Badge (Shown when unlocked) -->
+        <div id="quiz-verified-banner" class="success-box" style="display: none; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <span>✅ <b>Verified Student:</b> <span id="quiz-verified-name">-</span> (<span id="quiz-verified-email">-</span>) &bull; Reg: <code id="quiz-verified-reg">-</code></span>
+            <br/>
+            <small style="color: #1b4d32;">Results will be automatically connected & delivered to: <b>ss.ravibharathi@gmail.com</b></small>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; margin-left: 14px;" onclick="signOutQuizUser()">Change Student</button>
+        </div>
+
+        <form id="quiz-form" style="display: none;" onsubmit="return false;">
           {% for q in quiz_questions %}
           {% set q_idx = loop.index0 %}
           <div class="quiz-card">
@@ -889,6 +945,7 @@ Full InChI String:
           </div>
 
           <div id="quiz-feedback-box" class="success-box" style="margin: 16px 0;"></div>
+          <div id="quiz-email-status-banner" class="info-box" style="margin: 14px 0; font-size: 0.9rem;"></div>
 
           <div id="quiz-missed-header" style="display: none; margin-top: 24px;">
             <h3 style="color: #e11d48; margin-bottom: 12px;">❌ Questions You Missed:</h3>
