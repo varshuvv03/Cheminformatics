@@ -52,6 +52,60 @@ body {
   max-height: 100vh;
   position: sticky;
   top: 0;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sidebar-close,
+.sidebar-toggle {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--primary-dark);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.sidebar-close {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+.sidebar-close:hover,
+.sidebar-toggle:hover {
+  background: var(--primary-subtle);
+}
+
+.app-toolbar {
+  min-height: 52px;
+  padding: 8px 40px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+body.sidebar-collapsed .sidebar {
+  display: none;
 }
 
 .sidebar h2 {
@@ -631,11 +685,42 @@ body {
     flex-direction: column;
   }
   .sidebar {
+    position: fixed;
+    z-index: 1001;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(var(--sidebar-width), calc(100vw - 48px));
+    max-height: 100dvh;
+    border-right: 1px solid var(--border-color);
+    border-bottom: none;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0.2s ease;
+  }
+  body.sidebar-open .sidebar {
+    transform: translateX(0);
+    visibility: visible;
+  }
+  body.sidebar-open {
+    overflow: hidden;
+  }
+  .sidebar-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
     width: 100%;
-    max-height: none;
-    position: static;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
+    height: 100%;
+    border: 0;
+    background: rgba(15, 23, 42, 0.42);
+  }
+  .app-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 8px 16px;
+    background: #ffffff;
   }
   .main-content {
     padding: 20px 16px;

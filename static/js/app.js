@@ -27,6 +27,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Initialize Sidebar
 function initSidebar() {
+  const sidebar = document.getElementById("app-sidebar");
+  const toggleButton = document.getElementById("sidebar-toggle");
+  const toggleLabel = document.getElementById("sidebar-toggle-label");
+  const closeButton = document.getElementById("sidebar-close");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  const mobileViewport = window.matchMedia("(max-width: 900px)");
+
+  const setSidebarOpen = (open) => {
+    document.body.classList.toggle("sidebar-open", open && mobileViewport.matches);
+    document.body.classList.toggle("sidebar-collapsed", !open && !mobileViewport.matches);
+    sidebar.inert = !open;
+    sidebar.setAttribute("aria-hidden", String(!open));
+    toggleButton.setAttribute("aria-expanded", String(open));
+    toggleLabel.textContent = open ? "Close panel" : "Open panel";
+    backdrop.hidden = !(open && mobileViewport.matches);
+  };
+
+  setSidebarOpen(!mobileViewport.matches);
+  toggleButton.addEventListener("click", () => {
+    setSidebarOpen(toggleButton.getAttribute("aria-expanded") !== "true");
+  });
+  closeButton.addEventListener("click", () => setSidebarOpen(false));
+  backdrop.addEventListener("click", () => setSidebarOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && toggleButton.getAttribute("aria-expanded") === "true") {
+      setSidebarOpen(false);
+      toggleButton.focus();
+    }
+  });
+  mobileViewport.addEventListener("change", (event) => setSidebarOpen(!event.matches));
+
   const nameInput = document.getElementById("sidebar-name");
   const regInput = document.getElementById("sidebar-reg");
   const molSelect = document.getElementById("sidebar-example-select");
@@ -124,6 +155,9 @@ function initNavigation() {
 
 function showPage(pageKey) {
   state.currentPage = pageKey;
+  if (window.matchMedia("(max-width: 900px)").matches) {
+    document.getElementById("sidebar-close").click();
+  }
 
   // Update navigation highlighting
   document.querySelectorAll(".nav-radio-item").forEach((item) => {

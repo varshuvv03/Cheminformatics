@@ -14,11 +14,14 @@
   <!-- ========================================================================= -->
   <!-- SIDEBAR                                                                   -->
   <!-- ========================================================================= -->
-  <aside class="sidebar">
-    <div>
-      <h2>🧪 Cheminformatics Virtual Lab</h2>
-      <div class="sidebar-subhead">SRMIST Tiruchirappalli Campus</div>
-      <div class="sidebar-caption">Dept. of Cybersecurity &bull; Faculty of Engineering & Technology</div>
+  <aside class="sidebar" id="app-sidebar">
+    <div class="sidebar-brand">
+      <div>
+        <h2>🧪 Cheminformatics Virtual Lab</h2>
+        <div class="sidebar-subhead">SRMIST Tiruchirappalli Campus</div>
+        <div class="sidebar-caption">Dept. of Cybersecurity &bull; Faculty of Engineering & Technology</div>
+      </div>
+      <button type="button" class="sidebar-close" id="sidebar-close" aria-label="Close side panel" title="Close side panel">×</button>
     </div>
 
     <div class="sidebar-divider"></div>
@@ -115,11 +118,17 @@
       </ul>
     </div>
   </aside>
+  <button type="button" class="sidebar-backdrop" id="sidebar-backdrop" aria-label="Close side panel" hidden></button>
 
   <!-- ========================================================================= -->
   <!-- MAIN CONTENT                                                              -->
   <!-- ========================================================================= -->
   <div class="main-wrapper">
+    <div class="app-toolbar">
+      <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-controls="app-sidebar" aria-expanded="true">
+        <span aria-hidden="true">☰</span><span id="sidebar-toggle-label">Close panel</span>
+      </button>
+    </div>
     <main class="main-content">
 
       <!-- ===================================================================== -->
